@@ -5,6 +5,8 @@ function siPrefix(amount, enableUpper = true, enableLower = true, enableMinor = 
   let prefixes = [];
   const add = (...additionalPrefix) => prefixes = prefixes.concat(additionalPrefix);
 
+  const noPrefix = ["", 0];
+
   if (enableUpper) add(
     ["Y", 24], ["Z", 21], ["E", 18], ["P", 15], ["T", 12], ["G", 9], ["M", 6], ["k", 3]
   );
@@ -14,7 +16,7 @@ function siPrefix(amount, enableUpper = true, enableLower = true, enableMinor = 
   );
 
   add(
-    ["", 0]
+    noPrefix
   );
 
   if (enableMinor) add(
@@ -25,16 +27,20 @@ function siPrefix(amount, enableUpper = true, enableLower = true, enableMinor = 
     ["m", -3], ["μ", -6], ["n", -9], ["p", -12], ["f", -15], ["a", -18], ["z", -21], ["y", -24]
   );
 
-  prefixes = prefixes.sort(([ap, ae], [bp, be]) => be - ae);
 
-  for (let i = 0; i < prefixes.length; i++) {
-    const [prefix, exp] = prefixes[i];
+  let pickedPrefix = noPrefix;
 
-    const multiplier = 10 ** exp;
+  if (Number.isFinite(amount)) {
+    prefixes = prefixes.sort(([ap, ae], [bp, be]) => be - ae);
 
-    if (i === prefixes.length - 1 || amount >= multiplier)
-      return frmFloat.format(amount / multiplier) + " " + prefix;
+    for (const prefix of prefixes)
+      if (amount >= (10 ** prefix[1])) {
+        pickedPrefix = prefix;
+        break;
+      }
   }
+
+  return frmFloat.format(amount / (10 ** pickedPrefix[1])) + " " + pickedPrefix[0];
 }
 
 async function empty(amount) {
@@ -55,9 +61,12 @@ async function promiseAwaits(amount) {
   }
 }
 
+function chooseRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 function randomChar() {
-  const letters = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"];
-  return letters[Math.floor(Math.random() * letters.length)];
+  return chooseRandom(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]);
 }
 
 async function randomString(amount) {
@@ -71,7 +80,7 @@ async function randomString(amount) {
 }
 
 async function testAll(fncs, maxExp = 8, enableColors = false) {
-  const fncNameLength = fncs.map(f => f.name.length + 2).reduce((p, c) => p > c ? p : c, 0);
+  const fncNameLength = fncs.map(f => f.name.length).reduce((p, c) => p > c ? p : c, 0);
 
   for (let e = 2; e <= maxExp; e++) {
     const amount = 10 ** e;
@@ -90,7 +99,7 @@ async function testAll(fncs, maxExp = 8, enableColors = false) {
 
       console.log(
         "%s took %s which results in %s or %s",
-        blue + ("[" + fnc.name + "]").padEnd(fncNameLength, " ") + reset,
+        blue + ("[" + fnc.name + "]").padEnd(fncNameLength + 2, " ") + reset,
         green + siPrefix(duration, false) + "s" + reset,
         green + siPrefix(duration / amount) + "s/call" + reset,
         green + siPrefix(amount / duration) + "hz" + reset
@@ -100,8 +109,11 @@ async function testAll(fncs, maxExp = 8, enableColors = false) {
   }
 }
 
-testAll([empty, division, promiseAwaits, randomString], 7, false)
-  .catch(e => {
-    console.error(e);
+testAll(
+  [empty, division, promiseAwaits, randomString], 7,
+  (typeof process !== "undefined") ? process.stdout.hasColors() : false
+).catch(e => {
+  console.error(e);
+  if (typeof process !== "undefined")
     process.exit(1);
-  });
+});
